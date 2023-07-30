@@ -19,3 +19,23 @@ spec:
             name: nginx
             port:
               number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworldingress
+  namespace: helloworld
+spec:
+  selector:
+    name: nginx
+  type: LoadBalancer
+  loadBalancerIP: 192.168.1.114
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 443
