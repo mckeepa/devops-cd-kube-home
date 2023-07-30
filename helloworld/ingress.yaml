@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+spec:
+  rules:
+  - host: "helloworld.local"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/(.*)"
+        backend:
+          service:
+            name: service1
+            port:
+              number: 80
+  - host: "api.myothersite.net"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/service2/(.*)"
+        backend:
+          service:
+            name: service2
+            port:
+              number: 80
+      - pathType: Prefix
+        path: "/service3/(.*)"
+        backend:
+          service:
+            name: service3
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress
+  namespace: helloworld
+spec:
+  selector:
+    name: nginx
+  type: LoadBalancer
+  loadBalancerIP: 192.168.1.114
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 443
