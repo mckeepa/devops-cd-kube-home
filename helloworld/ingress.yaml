@@ -16,24 +16,7 @@ spec:
         path: "/(.*)"
         backend:
           service:
-            name: service1
-            port:
-              number: 80
-  - host: "api.myothersite.net"
-    http:
-      paths:
-      - pathType: Prefix
-        path: "/service2/(.*)"
-        backend:
-          service:
-            name: service2
-            port:
-              number: 80
-      - pathType: Prefix
-        path: "/service3/(.*)"
-        backend:
-          service:
-            name: service3
+            name: nginx
             port:
               number: 80
 ---
