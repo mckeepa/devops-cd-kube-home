@@ -1,0 +1,250 @@
+---
+- hosts: masters
+  become: yes
+  become_user: root
+  tasks:
+
+  - name: Install pre-requisite packages
+    dnf: name={{ item }} state=present
+    with_items:
+      - dnf-plugins-core
+  
+  - name: Add Docker repository
+    command: "dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo" 
+
+
+  # - name: Install Docker Engine
+  #   dnf: name={{ item }} state=present
+  #   with_items:
+  #     - docker-ce
+  #     - docker-ce-cli 
+  #     - containerd.io
+
+  # - name: Ensure group "docker" exists
+  #   group:
+  #     name: docker
+  #     state: present
+
+  # - name: Ensure group "admin" exists
+  #   group:
+  #     name: admin
+  #     state: present
+
+  # - name: Add the user 'admin' with to group of 'docker'
+  #   user:
+  #     name: admin
+  #     group: admin
+  #     groups: docker
+  #     append: yes
+
+  # - name: Reload systemd daemon
+  #   systemd:
+  #     daemon_reload: yes
+
+  # - name: Enable and Start Docker service
+  #   service:
+  #     name: docker
+  #     enabled: yes
+  #     state: started
+
+  # - name: Validate Docker installation
+  #   command: "docker run hello-world"
+
+#     - name: make sure dnf-plugins.core installed
+#       dnf:
+#         name: dnf-plugins-core
+#         state: present
+
+#     - name: install docker repository
+#       command: dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+
+  #SElinux
+  - name: selinux permissive mode
+    ansible.posix.selinux:
+      policy: targeted
+      state: permissive
+
+  #ip tables
+  - name: ip tables
+    ansible.posix.sysctl:
+      name: net.ipv4.ip_forward
+      value: "1"
+      sysctl_set: yes
+      state: present
+      reload: yes
+  - name: ip tables
+    shell: |
+      cat <<EOF >  /etc/sysctl.d/k8s.conf
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      EOF
+      sysctl --system
+
+  # #swapoff
+  # - name: swapoff
+  #   shell: |
+  #     swapoff -a
+
+  # - name: Remove swapfrile from /etc/fstab
+  #   mount:
+  #     name: "{{ item}}"
+  #     fstab: swap
+  #     state: absent
+  #   with_items:
+  #     - swap
+
+  - name: Uninstall zram-generator-defaults
+    dnf: name={{ item }} autoremove=true
+    with_items:
+      - zram-generator-defaults
+  
+  #firewalld
+  - name: firewalld rules
+    firewalld:
+      permanent: yes
+      immediate: yes
+      port: "{{item.port}}/{{item.proto}}"
+      zone: public
+      state: enabled
+    with_items:
+      - { port: "6443", proto: "tcp" }
+      - { port: "2379-2380", proto: "tcp" }
+      - { port: "10250", proto: "tcp" }
+      - { port: "10251", proto: "tcp" }
+      - { port: "10252", proto: "tcp" }
+      - { port: "10255", proto: "tcp" }
+      - { port: "30000-32767", proto: "tcp" }
+      - { port: "16443", proto: "tcp" }
+      - { port: "10259", proto: "tcp" } # new
+      - { port: "10257", proto: "tcp" } # new
+      - { port: "179", proto: "tcp" }   # Calico networking (BGP)
+      - { port: "4789", proto: "udp" }  # Calico flannel networking (VXLAN)
+      - { port: "51821", proto: "udp" } # Calico networking with IPv6 Wireguard enabled
+      - { port: "51820", proto: "udp" } # Calico networking with IPv4 Wireguard enabled
+      - { port: "55473", proto: "tcp" } # Calico networking with Typha enabled
+      - { port: "5473", proto: "tcp" }  # Calico networking with Typha enabled
+      
+  - name: reload
+    service:
+      name: firewalld
+      state: reloaded
+
+
+  - name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
+    shell: |
+      swapoff -a
+    #when: kubernetes_installed is changed
+
+  - name: Disable SWAP in fstab since kubernetes can't work with swap enabled (2/2)
+    replace:
+      path: /etc/fstab
+      regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+      replace: '# \1'
+    #when: kubernetes_installed is changed
+    
+  - name: Add kubernetes yum repository
+    ansible.builtin.yum_repository:
+      name: Kubernetes
+      description: Kubernetes YUM repo
+      gpgkey: https://pkgs.k8s.io/core:/stable:/v1.29/rpm/repodata/repomd.xml.key
+      baseurl: https://pkgs.k8s.io/core:/stable:/v1.29/rpm/
+
+  - name: Install kubeadm kubelet kubectl
+    dnf: name={{ item }} state=present
+    with_items:
+      - kubeadm
+      - kubelet
+      - kubectl
+      # - kubernetes-master 
+      # - kubernetes-kubeadm
+
+  - name: Add cri-o yum repository
+    ansible.builtin.yum_repository:
+      name: CRI-O
+      description: Kubernetes YUM repo
+      gpgkey: https://pkgs.k8s.io/addons:/cri-o:/v1.29/rpm/repodata/repomd.xml.key
+      baseurl: https://pkgs.k8s.io/addons:/cri-o:/v1.29/rpm/
+
+  - name: Install cri-o
+    dnf: name={{ item }} state=present
+    with_items:
+      - cri-o
+
+  - name: Start service cri-o, if not started
+    ansible.builtin.service:
+      name: crio
+      state: started
+      enabled: yes    
+  
+  - name: Start service kubelet, if not started
+    ansible.builtin.service:
+      name: kubelet
+      state: started
+      enabled: yes    
+
+  - name: Initialize Kubernetes master
+    command: kubeadm init --pod-network-cidr=192.168.099.0/16 --cri-socket unix:///var/run/crio/crio.sock
+    register: kubeadm_output
+    ignore_errors: yes
+
+  - name: Set up kubectl for the current user
+    command: "{{ item }}"
+    with_items:
+      - "mkdir -p $HOME/.kube"
+      - "cp /etc/kubernetes/admin.conf $HOME/.kube/config"
+      - "chown $(id -u):$(id -g) $HOME/.kube/config"
+
+  - name: Install Calico network plugin
+    command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+    when: "'calico' in kubeadm_output.stdout"
+
+# - hosts: workers
+#   become: yes
+#   tasks:
+
+#     - name: make sure dnf-plugins.core installed
+#       dnf:
+#         name: dnf-plugins-core
+#         state: present
+
+#     - name: install docker repository
+#       command: dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+
+#     - name: make sure docker from distro is not installed
+#       yum:
+#         name: "{{ item }}"
+#         state: absent
+#       with_items:
+#         - docker
+#         - docker-common
+#         - container-selinux
+#         - docker-selinux
+#         - docker-engine
+
+#     - name: install docker
+#       dnf:
+#         name: "{{ item }}"
+#         state: present
+#       with_items:
+#         - docker-ce
+#         - python-docker-py
+#         - python-pip
+
+
+#     # - name: Install Docker
+#     #   dnf:
+#     #     name: docker.io
+#     #     state: present
+
+#     - name: Install kubeadm, kubelet, and kubectl
+#       dnf:
+#         name: "{{ item }}"
+#         state: present
+#       loop:
+#         - kubeadm
+#         - kubelet
+#         - kubectl
+
+#     - name: Join worker nodes to the cluster
+#       command: "{{ hostvars['master']['kubeadm_output']['stdout_lines'][0] }}"
+#       when: "'kubeadm join' in hostvars['master']['kubeadm_output']['stdout']"
