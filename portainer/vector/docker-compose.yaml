@@ -10,9 +10,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       
-      # Maps the config folder containing vector.yaml
-      - ./config:/etc/vector:ro
+      # Renamed to force Docker to create a fresh, clean folder
+      - ./vector_config:/etc/vector:ro
       
-      # FIX: Maps the logs folder from inside the config folder
-      - ./config/logs:/var/log/vector
+      # Moved completely separate from the config folder
+      - ./vector_logs:/var/log/vector
     restart: unless-stopped
