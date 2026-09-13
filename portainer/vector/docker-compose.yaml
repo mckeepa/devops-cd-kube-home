@@ -2,17 +2,17 @@ version: '3.8'
 
 services:
   vector:
-    image: timberio/vector:latest-alpine
+    image: timberio/vector:0.58.0-debian
     container_name: vector
     ports:
       - "8686:8686"
     volumes:
-      # Connect to host Docker engine for container logs
+      # Connect to Docker engine
       - /var/run/docker.sock:/var/run/docker.sock:ro
       
-      # FIX: Exact relative path from your Git root to your config file
-      - ./portainer/vector/config/vector.yaml:/etc/vector/vector.yaml:ro
+      # FIX: Uses the fresh folder name directly relative to this compose file
+      - ./v_config/vector.yaml:/etc/vector/vector.yaml:ro
       
-      # FIX: Keep the logs folder right alongside it
-      - ./portainer/vector/logs:/var/log/vector
+      # Stores logs in a fresh companion folder
+      - ./v_logs:/var/log/vector
     restart: unless-stopped
