@@ -10,9 +10,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       
-      # Renamed to force Docker to create a fresh, clean folder
-      - ./vector_config:/etc/vector:ro
-      
-      # Moved completely separate from the config folder
-      - ./vector_logs:/var/log/vector
+      # FIX: Explicitly target the subdirectory path from the Git root
+      - ./portainer/vector/vector_config:/etc/vector:ro
+      - ./portainer/vector/vector_logs:/var/log/vector
     restart: unless-stopped
