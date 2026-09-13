@@ -6,56 +6,13 @@ services:
     container_name: vector
     ports:
       - "8686:8686"
-    # Bypasses disk mounts by creating the file in memory right before Vector starts
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        mkdir -p /etc/vector
-        cat << 'EOF' > /etc/vector/vector.yaml
-        api:
-          enabled: true
-          address: "0.0.0.0:8686"
-
-        sources:
-          docker_containers:
-            type: "docker_logs"
-            exclude_containers:
-              - "vector"
-
-        transforms:
-          parse_and_enrich:
-            type: "remap"
-            inputs:
-              - "docker_containers"
-            source: |
-              if can_be_parsed_as_json(.message) {
-                structured = parse_json!(.message)
-                . = merge(., structured)
-              }
-              .environment = "production"
-
-        sinks:
-          local_file_storage:
-            type: "file"
-            inputs:
-              - "parse_and_enrich"
-            compression: "none"
-            path: "/var/log/vector/%Y-%m-%d-container-logs.log"
-            encoding:
-              codec: "json"
-
-          stdout_console:
-            type: "console"
-            inputs:
-              - "parse_and_enrich"
-            encoding:
-              codec: "json"
-        EOF
-        
-        # Now launch Vector using the file we just generated inline
-        exec vector --config /etc/vector/vector.yaml
     volumes:
+      # Connect to host Docker engine for container logs
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./portainer/vector/vector_logs:/var/log/vector
+      
+      # FIX: Exact relative path from your Git root to your config file
+      - ./portainer/vector/config/vector.yaml:/etc/vector/vector.yaml:ro
+      
+      # FIX: Keep the logs folder right alongside it
+      - ./portainer/vector/logs:/var/log/vector
     restart: unless-stopped
