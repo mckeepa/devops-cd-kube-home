@@ -10,9 +10,11 @@ kubectl apply -n argocd -f install.yaml
 kubectl create -n argocd secret tls argocd-server-tls --cert=`~/argocd/cert.pem`  --key=`~/argocd/key.pem`
 
 kubectl create -n argocd secret tls argocd-server-tls \
-  --cert=~/argocd/cert.pem \
-  --key=~/argocd/key.pem
+  --cert=/home/paul/argocd/cert.pem \
+  --key=/home/paul/argocd/key.pem
 
+
+## Get password for "admin"
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
 

@@ -6,9 +6,13 @@ services:
     container_name: vector
     ports:
       - "8686:8686"
+    # Overwrite Vector's default start command to look inside the mapped directory
+    command: ["--config-dir", "/etc/vector/"]
     volumes:
-      # Mount the Docker socket to allow Vector to collect logs from other containers
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Mount your local vector configuration file from the host machine
-      - /path/to/your/host/vector.yaml:/etc/vector/vector.yaml:ro
+      
+      # FIX: Map the FOLDER instead of the file
+      - ./config:/etc/vector:ro
+      
+      - ./logs:/var/log/vector
     restart: unless-stopped

@@ -1,0 +1,37 @@
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: data-pv-vault
+#   labels:
+#     type: local
+# spec:
+#   accessModes:
+#   - ReadWriteOnce
+#   capacity:
+#     storage: 2Gi
+#   hostPath:
+# #    path: "/mnt/data/ckan"
+#     path: "/opt/k8/vault"
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"PersistentVolume","metadata":{"annotations":{},"labels":{"type":"local"},"name":"task-pv-volume"},"spec":{"accessModes":["ReadWriteOnce"],"capacity":{"storage":"10Gi"},"hostPath":{"path":"/opt/k8/pv/data"},"storageClassName":"manualdata"}}
+    pv.kubernetes.io/bound-by-controller: "yes"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    type: local
+  name: data-pv-vault
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 10Gi
+  hostPath:
+    path: "/opt/k8/vault"
+    type: ""
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manualdata
+  volumeMode: Filesystem
